@@ -1,0 +1,8 @@
+# Virtual environment folder ko ignore karein
+.venv/
+env/
+
+# Cached files aur dusre folders ko ignore karein
+__pycache__/
+*.pyc
+.DS_Store
