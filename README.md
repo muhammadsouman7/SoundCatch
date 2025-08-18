@@ -25,16 +25,16 @@ The entire process is designed to be quick and efficient, giving you the song yo
 
 **Technology Stack**
 
-**Frontend:**
-1. HTML
-2. CSS
-3. JavaScript
-4. Bootstrap
+   **Frontend:**
+   1. HTML
+   2. CSS
+   3. JavaScript
+   4. Bootstrap
 
-**Backend:**
-1. Python
-2. Flask (Web Framework)
-3. yt-dlp (Media Downloader)
+   **Backend:**
+   1. Python
+   2. Flask (Web Framework)
+   3. yt-dlp (Media Downloader)
 
 
 **Getting Started**
