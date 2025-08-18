@@ -20,9 +20,9 @@ def makeSafeFilename(name):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        songName = request.form.get("song")
-        if not songName:
-            return jsonify({"error": "Song name not provided."}), 400
+        audioName = request.form.get("audio")
+        if not audioName:
+            return jsonify({"error": "audio name not provided."}), 400
 
         try:
             # Check if cookies are available from Vercel's environment variables
@@ -51,10 +51,10 @@ def index():
 
             with yt_dlp.YoutubeDL(ydlOpts) as ydl:
                 # Search for the video and get its info
-                info = ydl.extract_info(f"{songName} song", download=False)
+                info = ydl.extract_info(f"{audioName} audio", download=False)
 
                 if not info or "entries" not in info or not info["entries"]:
-                    return jsonify({"error": "Could not find a video for that song."}), 404
+                    return jsonify({"error": "Could not find a video for that audio."}), 404
 
                 # Get the URL of the best audio stream
                 best_audio_stream = ydl.extract_info(info["entries"][0]["url"], download=False, process=True)
@@ -71,7 +71,7 @@ def index():
                     return jsonify({"error": "No suitable audio stream found."}), 404
 
                 # Get the title for the filename from user input (more relevant and cleaner)
-                title_for_filename = request.form.get("song", "song")
+                title_for_filename = request.form.get("audio", "audio")
                 safeName = makeSafeFilename(title_for_filename)
 
                 # Send the direct URL and filename back to the frontend
