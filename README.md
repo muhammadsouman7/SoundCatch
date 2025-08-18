@@ -1,6 +1,6 @@
 **SoundCatch: Catch the sound you love, anytime.**
 
-SoundCatch: Catch the sound you love, anytime. SoundCatch is a simple and elegant web application that lets you download any available audio from YouTube by simply typing in a keyword. It can be used to download: to download Quran Surahs, Tafseer lectures, Naats, Nasheeds, Music or any other type of audio available on YouTube.
+SoundCatch is a simple and elegant web application that lets you download any available audio from YouTube by simply typing in a keyword. It can be used to download: to download Quran Surahs, Tafseer lectures, Naats, Nasheeds, Music or any other type of audio available on YouTube.
 
 This project was born out of a simple idea: to make it easier for people to access their desired audios without navigating complex websites or dealing with annoying ads. SoundCatch is designed to be fast, straightforward, and user-friendly.
 
