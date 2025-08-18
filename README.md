@@ -17,9 +17,9 @@ This project was born out of a simple idea: to make it easier for people to down
 
 SoundCatch uses a straightforward client-server architecture:
 1. Frontend (Web Interface): The user enters a song name into a form on the main page.
-2. Backend (Flask Server): The server receives the song name and uses the powerful yt-dlp library to search for the song on YouTube.
-3. Audio Extraction: It finds the top search result, downloads the video's audio, and stores it in memory.
-4. Download: The server then sends the audio file back to the user's browser, allowing them to download it instantly.
+2. Backend (Flask Server): The server receives the song name, fetches a direct audio URL using the powerful yt-dlp library with the provided cookies, and sends this URL back to the frontend.
+3. Client-Side Download: The user's browser receives the direct audio URL and handles the entire download process, which makes the process faster and more reliable.
+
 The entire process is designed to be quick and efficient, giving you the song you want in a matter of moments.
 
 
