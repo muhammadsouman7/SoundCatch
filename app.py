@@ -5,6 +5,7 @@ from flask_cors import CORS
 import requests
 import io
 import os
+import tempfile
 
 app = Flask(__name__)
 # CORS is crucial for allowing the frontend to make requests
@@ -24,6 +25,11 @@ def index():
             return jsonify({"error": "Song name not provided."}), 400
 
         try:
+            # Check if cookies are available from Vercel's environment variables
+            cookies = os.environ.get("groot")
+            if not cookies:
+                return jsonify({"error": "Cookies not found. Please add cookies to Vercel environment variables with the name 'groot'."}), 500
+
             # yt-dlp options to find the best audio format without downloading
             ydlOpts = {
                 # Prioritize m4a, mp3, and then the best available audio format.
@@ -34,17 +40,14 @@ def index():
                 "default_search": "ytsearch",
                 "extract_flat": "in_playlist", # Speeds up searches
                 "socket_timeout": 60, # Set a 60-second timeout for network requests
-                # Yahan par cookies add karein
-                "cookiefile": "cookies.txt"
             }
+            
+            # Use a temporary file to store cookies since the file system is read-only
+            with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_cookies_file:
+                temp_cookies_file.write(cookies)
+                cookies_path = temp_cookies_file.name
 
-            # Check if cookies are available from Vercel's environment variables
-            cookies = os.environ.get("groot")
-            if cookies:
-                with open("cookies.txt", "w") as f:
-                    f.write(cookies)
-            else:
-                return jsonify({"error": "Cookies not found. Please add YTDLP_COOKIES to Vercel environment variables."}), 500
+            ydlOpts["cookiefile"] = cookies_path
 
             with yt_dlp.YoutubeDL(ydlOpts) as ydl:
                 # Search for the video and get its info
@@ -80,6 +83,9 @@ def index():
         except Exception as e:
             print(f"An error occurred: {str(e)}")
             return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        finally:
+            if 'cookies_path' in locals() and os.path.exists(cookies_path):
+                os.remove(cookies_path)
 
     return render_template("index.html")
 
