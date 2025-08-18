@@ -1,22 +1,28 @@
+// Grab references to the main cards and the button
 const landingCard = document.getElementById('landingCard');
 const downloaderCard = document.getElementById('downloaderCard');
 const useSoundCatchBtn = document.getElementById('useSoundCatchBtn');
 
-// Handle "Use SoundCatch" button click
+// When the "Use SoundCatch" button is clicked
 useSoundCatchBtn.addEventListener('click', () => {
-    // Fade out landing card
+    // Start by fading out the landing card
     landingCard.classList.remove('fade-in-card');
     landingCard.classList.add('fade-out-card');
 
-    // Wait for fade-out animation to finish
+    // Give the fade-out animation time to finish before switching views (700ms)
     setTimeout(() => {
-        landingCard.classList.add('d-none'); // hide landing card
-        downloaderCard.classList.remove('d-none'); // show downloader card
-        downloaderCard.classList.add('fade-in-card'); // fade in downloader card
-    }, 700); // must match CSS animation duration
+        // Completely hide the landing card
+        landingCard.classList.add('d-none');
+        // Make the downloader card visible
+        downloaderCard.classList.remove('d-none');
+        // Animate the downloader card so it fades in smoothly
+        downloaderCard.classList.add('fade-in-card');
+    }, 700); // This number should always match the CSS animation duration
 });
 
+// Run after the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Grab references to form elements and UI pieces
     const songInput = document.getElementById('songInput');
     const downloadBtn = document.getElementById('downloadBtn');
     const downloadForm = document.getElementById('downloadForm');
@@ -25,9 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressBarContainer = document.getElementById('progressBarContainer');
     const progressBar = document.getElementById('progressBar');
 
-    let fIntervals;
+    let fIntervals; // Will hold the fake progress interval
 
-    // Show button only when input has text
+    // Only show the "Download" button if the user has typed something
     songInput.addEventListener('input', () => {
         if (songInput.value.trim().length > 0) {
             downloadBtn.classList.remove('d-none');
@@ -39,90 +45,101 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Handle form submission
+    // Handle the form submission (downloading process)
     downloadForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+        e.preventDefault(); // Don’t reload the page
 
-        const songName = songInput.value.trim();
-
-        // Reset UI
+        // Reset the UI before starting a new download
         hideProgressBar();
-        startFakeProgress(); // start fake progress bar
+        startFakeProgress(); // Begin fake progress animation
         downloadBtn.disabled = true;
-        btnText.textContent = 'Downloading...';
+        btnText.textContent = 'Fetching the song...';
         btnSpinner.classList.remove('d-none');
 
         const formData = new FormData(downloadForm);
 
+        // Step 1: Ask the backend for the actual audio URL and filename
         fetch(downloadForm.action, {
                 method: 'POST',
                 body: formData,
             })
             .then(response => {
-                if (!response.ok) throw new Error('Network error');
-                return response.blob();
+                if (!response.ok) {
+                    // If backend sends an error, read it and throw so it goes to catch()
+                    return response.json().then(err => { throw new Error(err.error) });
+                }
+                return response.json();
             })
-            .then(blob => {
-                // Complete progress
+            .then(data => {
+                // Make sure backend gave us both audio_url and filename
+                if (!data.audio_url || !data.filename) {
+                    throw new Error("Invalid response from server.");
+                }
+
+                // Step 2: Create a new URL to trigger the actual download
+                const downloadUrl = `/download_audio?url=${encodeURIComponent(data.audio_url)}&filename=${encodeURIComponent(data.filename)}`;
+
+                // Navigating to this URL will start the download automatically
+                window.location.href = downloadUrl;
+
+                // Since we’ve triggered the download, we assume success
                 stopFakeProgress(true);
-
-                // Safe filename from input
-                const safeFilename = songName.replace(/[\\/*?:"<>|]/g, '');
-                const filename = safeFilename ? `${safeFilename}.m4a` : 'song.m4a';
-
-                // Trigger download
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
             })
-            .catch(error => {
+            .catch((error) => {
+                // If anything goes wrong, log it and let the user know
                 console.error('Download failed:', error);
-                alert('Download failed. Please try again.');
+                alert(`Download failed: ${error.message}. Please try again.`);
                 stopFakeProgress(false);
-            })
-            .finally(() => {
-                downloadBtn.disabled = false;
-                btnText.textContent = 'Download';
-                btnSpinner.classList.add('d-none');
             });
     });
 
-    // Hide progress bar
+    // Hide and reset the progress bar
     function hideProgressBar() {
         clearInterval(fIntervals);
         progressBarContainer.classList.add('d-none');
         progressBar.style.width = '0%';
         progressBar.textContent = '';
-        progressBar.classList.remove('bg-success');
     }
 
-    // Fake progress bar
+    // Start showing a "fake" progress bar to make the UI feel responsive
     function startFakeProgress() {
         let value = 0;
         progressBarContainer.classList.remove('d-none');
         fIntervals = setInterval(() => {
+            // Only increase progress until 90% so it feels like it’s "loading"
             if (value < 90) {
-                value += Math.floor(Math.random() * 5) + 1;
+                value += Math.floor(Math.random() * 4) + 1;
                 if (value > 90) value = 90;
                 updateProgress(value);
             }
-        }, 500);
+        }, 500); // Update every half a second
     }
 
-    // Stop progress bar
+    // Stop the fake progress and handle success/failure UI
     function stopFakeProgress(success) {
         clearInterval(fIntervals);
-        updateProgress(100);
-        if (success) progressBar.classList.add('bg-success');
+        updateProgress(100); // Fill the bar
+
+        if (success) {
+            progressBar.classList.add('bg-success');
+            btnText.textContent = 'Download Started!';
+            btnSpinner.classList.add('d-none');
+
+            // After a few seconds, reset everything back
+            setTimeout(() => {
+                btnText.textContent = 'Download';
+                downloadBtn.disabled = false;
+                progressBar.classList.remove('bg-success');
+            }, 3000);
+        } else {
+            // On failure, just reset button states
+            btnText.textContent = 'Download';
+            btnSpinner.classList.add('d-none');
+            downloadBtn.disabled = false;
+        }
     }
 
-    // Update progress bar
+    // Update progress bar visually
     function updateProgress(value) {
         progressBar.style.width = value + '%';
         progressBar.textContent = value + '%';
