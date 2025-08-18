@@ -30,6 +30,12 @@ def index():
             if not cookies:
                 return jsonify({"error": "Cookies not found. Please add cookies to Vercel environment variables with the name 'groot'."}), 500
 
+            # Use a temporary file to store cookies since the file system is read-only
+            # We explicitly use /tmp which is writable on Vercel.
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, dir='/tmp') as temp_cookies_file:
+                temp_cookies_file.write(cookies)
+                cookies_path = temp_cookies_file.name
+
             # yt-dlp options to find the best audio format without downloading
             ydlOpts = {
                 # Prioritize m4a, mp3, and then the best available audio format.
@@ -40,14 +46,8 @@ def index():
                 "default_search": "ytsearch",
                 "extract_flat": "in_playlist", # Speeds up searches
                 "socket_timeout": 60, # Set a 60-second timeout for network requests
+                "cookiefile": cookies_path, # Pass the path to the temporary cookie file
             }
-            
-            # Use a temporary file to store cookies since the file system is read-only
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_cookies_file:
-                temp_cookies_file.write(cookies)
-                cookies_path = temp_cookies_file.name
-
-            ydlOpts["cookiefile"] = cookies_path
 
             with yt_dlp.YoutubeDL(ydlOpts) as ydl:
                 # Search for the video and get its info
