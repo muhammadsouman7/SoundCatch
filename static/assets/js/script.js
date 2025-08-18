@@ -23,7 +23,7 @@ useSoundCatchBtn.addEventListener('click', () => {
 // Run after the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Grab references to form elements and UI pieces
-    const songInput = document.getElementById('songInput');
+    const audioInput = document.getElementById('audioInput');
     const downloadBtn = document.getElementById('downloadBtn');
     const downloadForm = document.getElementById('downloadForm');
     const btnText = document.getElementById('btnText');
@@ -34,8 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let fIntervals; // Will hold the fake progress interval
 
     // Only show the "Download" button if the user has typed something
-    songInput.addEventListener('input', () => {
-        if (songInput.value.trim().length > 0) {
+    audioInput.addEventListener('input', () => {
+        if (audioInput.value.trim().length > 0) {
             downloadBtn.classList.remove('d-none');
             downloadBtn.classList.add('fade-in');
         } else {
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideProgressBar();
         startFakeProgress(); // Begin fake progress animation
         downloadBtn.disabled = true;
-        btnText.textContent = 'Fetching the song...';
+        btnText.textContent = 'Fetching the audio...';
         btnSpinner.classList.remove('d-none');
 
         const formData = new FormData(downloadForm);
