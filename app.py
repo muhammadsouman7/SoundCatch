@@ -20,9 +20,9 @@ def makeSafeFilename(name):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        audioName = request.form.get("audio")
-        if not audioName:
-            return jsonify({"error": "audio name not provided."}), 400
+        songName = request.form.get("song")
+        if not songName:
+            return jsonify({"error": "Song name not provided."}), 400
 
         try:
             # Check if cookies are available from Vercel's environment variables
@@ -47,14 +47,16 @@ def index():
                 "extract_flat": "in_playlist", # Speeds up searches
                 "socket_timeout": 60, # Set a 60-second timeout for network requests
                 "cookiefile": cookies_path, # Pass the path to the temporary cookie file
+                # ADDED: This user agent makes the request look like a real browser
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.88 Safari/537.36",
             }
 
             with yt_dlp.YoutubeDL(ydlOpts) as ydl:
                 # Search for the video and get its info
-                info = ydl.extract_info(f"{audioName} audio", download=False)
+                info = ydl.extract_info(f"{songName} song", download=False)
 
                 if not info or "entries" not in info or not info["entries"]:
-                    return jsonify({"error": "Could not find a video for that audio."}), 404
+                    return jsonify({"error": "Could not find a video for that song."}), 404
 
                 # Get the URL of the best audio stream
                 best_audio_stream = ydl.extract_info(info["entries"][0]["url"], download=False, process=True)
@@ -71,7 +73,7 @@ def index():
                     return jsonify({"error": "No suitable audio stream found."}), 404
 
                 # Get the title for the filename from user input (more relevant and cleaner)
-                title_for_filename = request.form.get("audio", "audio")
+                title_for_filename = request.form.get("song", "song")
                 safeName = makeSafeFilename(title_for_filename)
 
                 # Send the direct URL and filename back to the frontend
