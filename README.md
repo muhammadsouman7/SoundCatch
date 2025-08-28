@@ -47,8 +47,8 @@ Make sure you have Python and pip installed on your system.
 
 1. Clone the repository:
 
-   		git clone https://github.com/your-username/your-repository-name.git
-        cd your-repository-name
+   		git clone https://github.com/muhammadsouman7/SoundCatch.git
+        cd SoundCatch
 3. Install the required Python packages:
    
         pip install -r requirements.txt
@@ -58,6 +58,7 @@ Make sure you have Python and pip installed on your system.
 Start the Flask development server:
 
         python app.py
+        
 Open your web browser and navigate to http://127.0.0.1:5000 to use the application.
 
 
