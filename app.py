@@ -1,127 +1,140 @@
-from flask import Flask, render_template, request, jsonify, Response
-import yt_dlp
-import re
+from flask import Flask, render_template, request, jsonify, send_file, after_this_request
 from flask_cors import CORS
-import requests
-import io
+import yt_dlp
+from moviepy import AudioFileClip  # Uses AudioFileClip for fast conversion
 import os
 import tempfile
+import urllib.parse
 
 app = Flask(__name__)
-# CORS is crucial for allowing the frontend to make requests
 CORS(app)
 
-def makeSafeFilename(name):
-    """
-    Removes invalid characters from a string to make it a safe filename.
-    """
-    return re.sub(r'[\\/*?:"<>|]', "", name)
-
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET"])
 def index():
-    if request.method == "POST":
-        songName = request.form.get("song")
-        if not songName:
-            return jsonify({"error": "Song name not provided."}), 400
-
-        try:
-            # Check if cookies are available from Vercel's environment variables
-            cookies = os.environ.get("groot")
-            if not cookies:
-                return jsonify({"error": "Cookies not found. Please add cookies to Vercel environment variables with the name 'groot'."}), 500
-
-            # Use a temporary file to store cookies since the file system is read-only
-            # We explicitly use /tmp which is writable on Vercel.
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, dir='/tmp') as temp_cookies_file:
-                temp_cookies_file.write(cookies)
-                cookies_path = temp_cookies_file.name
-
-            # yt-dlp options to find the best audio format without downloading
-            ydlOpts = {
-                # Prioritize m4a, mp3, and then the best available audio format.
-                "format": "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best",
-                "noplaylist": True,
-                "quiet": True,
-                "logger": None,
-                "default_search": "ytsearch",
-                "extract_flat": "in_playlist", # Speeds up searches
-                "socket_timeout": 60, # Set a 60-second timeout for network requests
-                "cookiefile": cookies_path, # Pass the path to the temporary cookie file
-                # ADDED: This user agent makes the request look like a real browser
-                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.88 Safari/537.36",
-            }
-
-            with yt_dlp.YoutubeDL(ydlOpts) as ydl:
-                # Search for the video and get its info
-                info = ydl.extract_info(f"{songName} song", download=False)
-
-                if not info or "entries" not in info or not info["entries"]:
-                    return jsonify({"error": "Could not find a video for that song."}), 404
-
-                # Get the URL of the best audio stream
-                best_audio_stream = ydl.extract_info(info["entries"][0]["url"], download=False, process=True)
-                
-                audio_url = None
-                file_ext = 'mp3'
-                
-                # We'll rely on yt-dlp to give us the best audio format directly
-                if 'url' in best_audio_stream and 'ext' in best_audio_stream:
-                    audio_url = best_audio_stream['url']
-                    file_ext = best_audio_stream['ext']
-                
-                if not audio_url:
-                    return jsonify({"error": "No suitable audio stream found."}), 404
-
-                # Get the title for the filename from user input (more relevant and cleaner)
-                title_for_filename = request.form.get("song", "song")
-                safeName = makeSafeFilename(title_for_filename)
-
-                # Send the direct URL and filename back to the frontend
-                return jsonify({
-                    "audio_url": audio_url,
-                    "filename": f"{safeName}.{file_ext}"
-                }), 200
-
-        except Exception as e:
-            print(f"An error occurred: {str(e)}")
-            return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-        finally:
-            if 'cookies_path' in locals() and os.path.exists(cookies_path):
-                os.remove(cookies_path)
-
     return render_template("index.html")
 
-# New route to handle the actual download
-@app.route("/download_audio", methods=["GET"])
-def download_audio():
-    audio_url = request.args.get('url')
-    filename = request.args.get('filename')
-
-    if not audio_url or not filename:
-        return "URL or filename not provided", 400
+# 1. Search Route
+@app.route("/search", methods=["POST"])
+def search_video():
+    query = request.form.get("audio", "").strip()
+    if not query:
+        return jsonify({"error": "Please enter a search query."}), 400
 
     try:
-        # Stream the file from the external URL to the Flask app, allowing redirects
-        # and setting a timeout to prevent an indefinite wait.
-        response = requests.get(audio_url, stream=True, allow_redirects=True, timeout=60)
-        response.raise_for_status() # Raise an exception for bad status codes
+        if query.startswith(("http://", "https://", "www.")):
+            search_target = query
+        else:
+            search_target = f"ytsearch1:{query}"
 
-        # This part now streams the content directly to the client
-        def generate_chunks():
-            for chunk in response.iter_content(chunk_size=8192):
-                yield chunk
+        ydl_opts = {
+            'quiet': True,
+            'extract_flat': 'in_playlist',
+            'skip_download': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
 
-        return Response(
-            generate_chunks(),
-            mimetype=response.headers['Content-Type'],
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            }
-        )
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(search_target, download=False)
+            
+            if not info:
+                return jsonify({"error": "No results found on YouTube."}), 404
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error downloading file: {e}")
-        return "Failed to download the audio file.", 500
+            if 'entries' in info and info['entries']:
+                valid_entries = [e for e in info['entries'] if e]
+                if not valid_entries:
+                    return jsonify({"error": "No results found on YouTube."}), 404
+                first_result = valid_entries[0]
+            else:
+                first_result = info
+
+            video_id = first_result.get('id')
+            title = first_result.get('title', query)
+            watch_url = first_result.get('webpage_url') or f"https://www.youtube.com/watch?v={video_id}"
+
+            if not video_id:
+                return jsonify({"error": "Could not parse video details."}), 500
+
+            return jsonify({
+                "video_id": video_id,
+                "title": title,
+                "watch_url": watch_url
+            }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Search error: {str(e)}"}), 500
+
+# 2. Process Download Route (Direct Best Audio / Flexible Video)
+@app.route("/process_download", methods=["POST"])
+def process_download():
+    watch_url = request.form.get("watch_url")
+    format_type = request.form.get("format_type", "audio")
+
+    if not watch_url:
+        return jsonify({"error": "Invalid video URL."}), 400
+
+    try:
+        temp_dir = tempfile.mkdtemp()
+        output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
+
+        # Select formats flexibly without hardcoding single-stream MP4 requirements
+        if format_type == "audio":
+            selected_format = 'bestaudio/best'
+        else:
+            selected_format = 'bestvideo+bestaudio/best'
+
+        ydl_opts = {
+            'outtmpl': output_template,
+            'format': selected_format,
+            'quiet': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(watch_url, download=True)
+            downloaded_file = ydl.prepare_filename(info)
+
+        # If audio requested, convert downloaded audio stream (m4a/webm) directly to MP3
+        if format_type == "audio":
+            audio_path = os.path.splitext(downloaded_file)[0] + ".mp3"
+            
+            # Using AudioFileClip is lighter and faster than VideoFileClip
+            clip = AudioFileClip(downloaded_file)
+            clip.write_audiofile(audio_path, logger=None)
+            clip.close()
+
+            # Clean up the raw downloaded audio file
+            if os.path.exists(downloaded_file) and downloaded_file != audio_path:
+                os.remove(downloaded_file)
+
+            final_file = audio_path
+        else:
+            final_file = downloaded_file
+
+        return jsonify({
+            "download_url": f"/get_file?path={urllib.parse.quote(final_file)}",
+            "filename": os.path.basename(final_file)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Processing error: {str(e)}"}), 500
+
+@app.route("/get_file", methods=["GET"])
+def get_file():
+    file_path = urllib.parse.unquote(request.args.get("path", ""))
+    
+    if not file_path or not os.path.exists(file_path):
+        return "File not found", 404
+
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(file_path)
+            os.rmdir(os.path.dirname(file_path))
+        except Exception:
+            pass
+        return response
+
+    return send_file(file_path, as_attachment=True)
 
 if __name__ == "__main__":
     app.run(debug=True)
