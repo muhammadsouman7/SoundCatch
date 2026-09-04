@@ -76,33 +76,36 @@ def process_download():
         temp_dir = tempfile.mkdtemp()
         output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-        # Select formats flexibly without hardcoding single-stream MP4 requirements
         if format_type == "audio":
             selected_format = 'bestaudio/best'
         else:
             selected_format = 'bestvideo+bestaudio/best'
 
+        # --- UPDATED OPTIONS HERE ---
         ydl_opts = {
             'outtmpl': output_template,
             'format': selected_format,
             'quiet': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['mweb', 'ios', 'tv_embedded']
+                }
+            }
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(watch_url, download=True)
             downloaded_file = ydl.prepare_filename(info)
 
-        # If audio requested, convert downloaded audio stream (m4a/webm) directly to MP3
+        # If audio requested, convert downloaded audio stream directly to MP3
         if format_type == "audio":
             audio_path = os.path.splitext(downloaded_file)[0] + ".mp3"
             
-            # Using AudioFileClip is lighter and faster than VideoFileClip
             clip = AudioFileClip(downloaded_file)
             clip.write_audiofile(audio_path, logger=None)
             clip.close()
 
-            # Clean up the raw downloaded audio file
             if os.path.exists(downloaded_file) and downloaded_file != audio_path:
                 os.remove(downloaded_file)
 
