@@ -63,7 +63,7 @@ def search_video():
     except Exception as e:
         return jsonify({"error": f"Search error: {str(e)}"}), 500
 
-# 2. Process Download Route (Direct Best Audio / Flexible Video)
+# 2. Process Download Route
 @app.route("/process_download", methods=["POST"])
 def process_download():
     watch_url = request.form.get("watch_url")
@@ -76,12 +76,19 @@ def process_download():
         temp_dir = tempfile.mkdtemp()
         output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
+        # Handle cookies from Vercel Environment Variable if available
+        cookie_path = None
+        cookies_env = os.environ.get("groot")
+        if cookies_env:
+            cookie_path = os.path.join(temp_dir, "cookies.txt")
+            with open(cookie_path, "w", encoding="utf-8") as f:
+                f.write(cookies_env)
+
         if format_type == "audio":
             selected_format = 'bestaudio/best'
         else:
             selected_format = 'bestvideo+bestaudio/best'
 
-        # --- UPDATED OPTIONS HERE ---
         ydl_opts = {
             'outtmpl': output_template,
             'format': selected_format,
@@ -89,16 +96,20 @@ def process_download():
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['mweb', 'ios', 'tv_embedded']
+                    'player_client': ['mweb', 'ios', 'android']
                 }
             }
         }
+
+        # Attach cookiefile option if present
+        if cookie_path and os.path.exists(cookie_path):
+            ydl_opts['cookiefile'] = cookie_path
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(watch_url, download=True)
             downloaded_file = ydl.prepare_filename(info)
 
-        # If audio requested, convert downloaded audio stream directly to MP3
+        # If audio requested, convert to MP3 via MoviePy
         if format_type == "audio":
             audio_path = os.path.splitext(downloaded_file)[0] + ".mp3"
             
